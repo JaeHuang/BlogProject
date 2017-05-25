@@ -1,0 +1,155 @@
+---
+title: "IMDB_EDA"
+output: html_document
+---
+
+For this project, we will need dplyr package for sql query and ggplot2 package for visualization. Now I'm loading these two packages.
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+First, I am loading the data to do the following exploretory, then take a glimps on the data structure and the data.
+```{r}
+dataset <- read.csv('IMDB/movie_metadata.csv', header = TRUE, stringsAsFactors = FALSE)
+str(dataset)
+head(dataset)
+```
+There are 5043 entries and 28 variables in this dataset.
+
+Let's see if there is any duplicate entry in this dataset.
+```{r}
+dataset %>% select(movie_title, gross, title_year) %>%
+  group_by(movie_title) %>%
+  summarise(n=n()) %>%
+  filter(n>1)
+```
+Here we see there are 119 entries that are duplicate.
+
+Now I am going to answer a couple of questions by using dplyr and visualzing it with ggplot2.
+The first question is, what are the total number of movies reviewed by year?
+To answer this question, I need to group the entries by year (title_year) and assign the count of entries in every group as n.
+```{r}
+movieNumYear <- dataset %>%
+  select(movie_title, title_year) %>%
+  group_by(title_year) %>%
+  summarise(n=n())
+movieNumYear <-na.omit(movieNumYear)
+head(movieNumYear)
+```
+
+
+It's hard to see the variation through the years by reading it in table, so I plot it in line chart.
+```{r}
+theme_update(plot.title = element_text(hjust = 0.5))
+ggplot(movieNumYear, aes(x=movieNumYear$title_year, y=movieNumYear$n))+
+  geom_line()+
+  geom_smooth(fill=NA)+
+  ggtitle("Number of movie by year")+
+  labs(x="Year", y="Number of movie")
+```
+It's obvious number of movies grows quickly after 1990, it may due to the reason it's difficult to record the movies before 1990 or there are truely much less movies before 1990.
+
+
+Now, let's find out the average imdb ratings through out the years. Again, I need to group the entries by year, but instead of count entries in groups, this time I need to get the average of imdb rating (imdb_score).
+```{r}
+avgScoreYear <- dataset %>%
+  select(imdb_score, title_year) %>%
+  group_by(title_year) %>% 
+  summarise(avg_score=round(mean(imdb_score),1))
+avgScoreYear <- na.omit(avgScoreYear)
+head(avgScoreYear)
+```
+
+```{r}
+ggplot(avgScoreYear, aes(x=avgScoreYear$title_year, y=avgScoreYear$avg_score)) +
+  ylim(4,10)+
+  geom_line()+
+  geom_smooth(fill=NA)+
+  ggtitle("Average imdb score by year")+
+  labs(x="Year", y="avg score")
+```
+
+Let's see how are the average imdb ratings between different content ratings.
+```{r}
+avgScoreCont <- dataset %>% 
+  select(content_rating, imdb_score) %>% 
+  group_by(content_rating) %>% 
+  summarise(avg_score=round(mean(imdb_score),1))
+
+avgScoreCont$content_rating[1] <- "Unspecified"
+head(avgScoreCont)
+```
+Because some of the entries don't have any content rating, I assigned those to 'Unspecified'.
+
+Let's see it in histogram.
+```{r}
+ggplot(avgScoreCont, aes(x=avgScoreCont$content_rating, avgScoreCont$avg_score))+
+  geom_bar(stat = 'identity') +
+  coord_flip()+
+  ggtitle("Average imdb rating by content rating")+
+  labs(x="content rating", y="imdb score")
+```
+Looks like programs involve mature content (TV-MA) tend to have higher imdb ratings. On the other thand, PG-13 and PG have lower ratings. But the ratings of all the content ratings are above 6.
+
+Which director have higher imdb ratings in their movie? Here it shows the top 20 directors.
+```{r}
+dirScore <- dataset %>% select(director_name, imdb_score) %>%
+  group_by(director_name) %>%
+  summarise(avg_score=round(mean(imdb_score),1)) %>%
+  arrange(desc(avg_score)) %>%
+  top_n(20)
+dirScore
+```
+
+```{r}
+ggplot(dirScore, aes(x=dirScore$director_name, y=dirScore$avg_score)) +
+  geom_bar(stat='identity') +
+  coord_flip()+
+  ggtitle("IMDB score by Top 20 directors")+
+  labs(x="Director name", y="imdb score")
+```
+It seems among top 20 directors, most have about the same ratings except John Blanchard, who has 9.5 average rating.
+
+Following the previous question, now I am also interested in which director has the higher ratings after 2000.
+```{r}
+dirScoreRecent <- dataset %>% select(director_name, imdb_score) %>%
+  filter(dataset$title_year > 2000)%>%
+  group_by(director_name) %>%
+  summarise(avg_score=round(mean(imdb_score),1)) %>%
+  arrange(desc(avg_score)) %>%
+  top_n(20)
+dirScoreRecent
+```
+
+
+Finally, I want to know for the movies after 2010, what are the top 3 movies in each year and the director, actors and gross for those movies. First, I set the years, then used a for loop to get the result in each year.
+```{r}
+years = c(2010:2016)
+y=2010
+for(y in years){
+  temp <- dataset %>% 
+    select(movie_title, director_name, actor_1_name, actor_2_name, actor_3_name, gross) %>%
+    filter(dataset$title_year==y) %>%
+    top_n(3, gross) %>%
+    arrange(desc(gross))
+  
+  noquote(rep('-',30, sep=""))
+  print(y)
+  print(temp)
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
