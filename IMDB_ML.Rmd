@@ -1,0 +1,102 @@
+---
+title: "IMDB_ML"
+output: html_document
+---
+
+Here I'm going to predict the gross of movie with other parameters like budget, cast_total_facebook_like.
+I'm going to use SVM, random forest and decision tree to predict
+
+First, I need to load packages I need to use those models, for example, 'randomForest' to use random forest and 'e1071' for SVM.
+
+```{r}
+library(randomForest)
+library(e1071)
+library(rpart)
+```
+
+Then load the dataset, sampling it and exclude some parameters that I don't want to use for predicting.
+```{r}
+dataset <- read.csv('movie_metadata.csv', header = TRUE)
+dataset <- na.omit(dataset)
+set.seed(100)
+index <- sample(1:nrow(dataset), round(0.85*nrow(dataset)))
+data_train <- dataset[index,]
+data_test <- dataset[-index,]
+
+data_train <- data_train[,c(3,5,6,8,9,13,14,19,22,23,24,25,26,28)]
+data_test <- data_test[,c(3,5,6,8,9,13,14,19,22,23,24,25,26,28)]
+# data_train[(apply(data_train, 1, function(y) any(y >100))),]
+
+```
+
+
+Now put the train data in model and get the goodness of the prediction by applying rmse measurement.
+```{r}
+model <- svm(data_train$gross ~ ., data_train)
+predictedGross <- predict(model, data_train)
+error <- data_train$gross - predictedGross
+rmse <- function(error){
+  sqrt(mean(error^2))
+}
+
+rmse(error)
+```
+
+To help to understand how good is the prediction with vidualization, I plot the first 20 data point to compare the actual gross and the predicted gross.
+```{r}
+x <- seq(1:20)
+{plot(x,data_train[1:20,]$gross,type = 'l', col='red', xlab = 'movie', ylab = 'Gross')
+lines(x,predictedGross[1:20], col='blue')
+legend("topright", legend = c('Actual Gross', 'Predicted Gross'), col = c('red', 'blue'), lty=1, cex=.75)}
+```
+We can see the predicted result are quite fit to the actual gross, while some are off the the actual gross. However, these are just trainning data. Now I'm going to use the test data apply to trained model.
+
+```{r}
+predictedGross <- predict(model, data_test)
+error <- data_test$gross - predictedGross
+rmse(error)
+```
+
+Now, let's see how good the prediction is in random forest.
+```{r}
+model <- randomForest(data_train$gross ~ ., data = data_train)
+predictedGross <- predict(model, data_train)
+error <- data_train$gross - predictedGross
+rmse(error)
+```
+The rmse for trainning data in random forest is much less than in SVM. But how is it for testing data?
+
+```{r}
+predictedGross <- predict(model, data_test)
+error <- data_test$gross - predictedGross
+rmse(error)
+```
+It's still less than the rmse in SVM. However, it's much more than the rmse for the training data, which indicates that it might have a over fitting issue. This can be solved by tuning the model, but I'll leave it now.
+
+Finally, let's how is decision tree.
+```{r}
+model <- rpart(data_train$gross ~ ., data = data_train)
+predictedGross <- predict(model, data_train)
+error <- data_train$gross - predictedGross
+rmse(error)
+```
+```{r}
+predictedGross <- predict(model, data_test)
+error <- data_test$gross - predictedGross
+rmse(error)
+```
+
+Also, we can take a peek at how the decision tree looks like by plot the model.
+To do this, I need to load the 'rpart.plot' package for a nicer graph. (The plot function didn't give me a insightful graph.)
+```{r}
+#install.packages('rpart.plot')
+library(rpart.plot)
+
+rpart.plot(model)
+```
+
+
+
+
+
+
